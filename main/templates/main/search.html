@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}{% partialdef title inline %}Поиск — AI Sci-Fi{% endpartialdef %}{% endblock %}
+
+{% partialdef results %}
+{% if query %}
+    {% for item in results %}
+        <a class="search-result" href="{{ item.get_absolute_url }}" hx-get="{{ item.get_absolute_url }}" hx-target="#page-content"
+           hx-swap="innerHTML swap:400ms settle:20ms show:window:top" hx-push-url="true" style="--i:{{ forloop.counter0 }}">
+            <span class="search-result-title">{{ item.title }}</span>
+            {% if item.snippet %}<span class="search-result-snippet">{{ item.snippet }}</span>{% endif %}
+            <span class="search-result-date">{{ item.updated_at|date:"d.m.Y H:i" }}</span>
+        </a>
+    {% empty %}
+        <p class="hud-empty">Ничего не найдено</p>
+    {% endfor %}
+{% else %}
+    <p class="hud-empty">Введите запрос для поиска по чатам</p>
+{% endif %}
+{% endpartialdef %}
+
+{% block content %}
+{% partialdef content inline %}
+<section class="hud-panel">
+    <header class="hud-panel-header">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <h1>Поиск</h1>
+    </header>
+    <div class="hud-panel-body">
+        <form action="{% url 'main:search' %}" method="get" role="search" onsubmit="return false">
+            <label class="visually-hidden" for="search-input">Поиск по чатам</label>
+            <input id="search-input" class="hud-input" type="search" name="q" value="{{ query }}" placeholder="Поиск по чатам…" autofocus
+                   hx-get="{% url 'main:search' %}" hx-trigger="input changed delay:300ms, search" hx-target="#search-results"
+                   hx-swap="innerHTML" hx-push-url="false" hx-indicator="#search-results">
+        </form>
+        <div class="search-results" id="search-results">{% partial results %}</div>
+    </div>
+</section>
+{% endpartialdef %}
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% partialdef title inline %}Регистрация — AI Sci-Fi{% endpartialdef %}{% endblock %}
+
+{% block background %}
+    <canvas id="neural-bg" aria-hidden="true"></canvas>
+    <script src="{% static 'main/js/neural-bg.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+{% partialdef content inline %}
+<section class="hud-panel auth-panel">
+    <img class="auth-logo" src="{% static 'main/img/stend-logo-for-dark-bg.svg' %}" alt="Logo">
+    <header class="hud-panel-header">
+        <svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="4"/><path d="M2 21a8 8 0 0 1 13-6.2M19 15v6M16 18h6"/></svg>
+        <h1>Регистрация</h1>
+    </header>
+
+    <form method="post" action="{% url 'main:register' %}" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+
+        {% for error in form.non_field_errors %}<p class="hud-error auth-error">{{ error }}</p>{% endfor %}
+
+        {% include 'main/profile.html#field' with field=form.username %}
+        {% include 'main/profile.html#field' with field=form.email %}
+        {% include 'main/profile.html#field' with field=form.password1 %}
+        {% include 'main/profile.html#field' with field=form.password2 %}
+
+        <button type="submit" class="hud-btn hud-btn-primary auth-submit">Создать аккаунт</button>
+    </form>
+
+    <p class="auth-switch">Уже есть аккаунт? <a href="{% url 'main:login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Войти</a></p>
+</section>
+{% endpartialdef %}
+{% endblock %}

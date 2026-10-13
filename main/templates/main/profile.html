@@ -1,0 +1,243 @@
+{% partialdef avatar %}{% with p=user.profile %}{% if user.is_authenticated and p.avatar %}<img src="{{ p.avatar.url }}" alt="">{% elif user.is_authenticated %}{{ user.first_name|default:user.username|first|upper }}{% else %}<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>{% endif %}{% endwith %}{% endpartialdef %}
+
+{% partialdef display_name %}{% if user.is_authenticated %}{{ user.get_full_name|default:user.username }}{% else %}Гость{% endif %}{% endpartialdef %}
+
+{% partialdef field %}
+<div class="hud-field{% if field.errors %} has-error{% endif %}">
+    <label class="hud-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {{ field }}
+    {% for error in field.errors %}<p class="hud-error">{{ error }}</p>{% endfor %}
+</div>
+{% endpartialdef %}
+
+{% partialdef api_section %}
+<div class="api-section" id="api-section">
+    {% if apis %}
+        <ul class="api-list">
+            {% for api in apis %}
+                <li class="api-item">
+                    <div class="api-item-info">
+                        <span class="api-item-name">{{ api.display_name }}</span>
+                        <span class="api-item-url">{{ api.api_url }}{% if api.masked_key %} · ключ {{ api.masked_key }}{% endif %}</span>
+                        <span class="api-item-status" id="api-status-{{ api.pk }}"></span>
+                    </div>
+                    <div class="api-item-actions">
+                        <button type="button" class="hud-btn hud-btn-sm" hx-post="{% url 'main:api_check' api.pk %}" hx-params="none"
+                                hx-target="#api-status-{{ api.pk }}" hx-swap="innerHTML" hx-indicator="#api-status-{{ api.pk }}">Проверить</button>
+                        <button type="button" class="icon-btn" aria-label="Удалить API" hx-post="{% url 'main:api_delete' api.pk %}" hx-params="none"
+                                hx-target="#api-section" hx-swap="outerHTML" hx-confirm="Удалить подключение «{{ api.display_name }}»?">
+                            <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+                        </button>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="api-empty">Пока нет подключений. Добавьте OpenAI-совместимый API — например Ollama, LM Studio или OpenAI.</p>
+    {% endif %}
+
+    <div class="api-add">
+        <p class="hud-label">Новое подключение</p>
+        {% for error in api_form.non_field_errors %}<p class="hud-error">{{ error }}</p>{% endfor %}
+        <div class="hud-grid">
+            {% with field=api_form.name %}{% partial field %}{% endwith %}
+            {% with field=api_form.api_url %}{% partial field %}{% endwith %}
+        </div>
+        {% with field=api_form.api_key %}{% partial field %}{% endwith %}
+        <button type="submit" class="hud-btn hud-btn-primary" form="api-add-form">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            Добавить
+        </button>
+    </div>
+</div>
+{% endpartialdef %}
+
+<div class="modal-header">
+    <h2 class="modal-title" id="profile-modal-title">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+        Профиль
+    </h2>
+    <button type="button" class="icon-btn" data-bs-dismiss="modal" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+</div>
+
+{% if not user.is_authenticated %}
+    <div class="modal-body profile-guest">
+        <div class="profile-avatar profile-avatar-lg">{% partial avatar %}</div>
+        <p class="profile-guest-title">Вы не вошли в систему</p>
+        <p class="profile-guest-text">Войдите, чтобы редактировать профиль и настройки.</p>
+        <div class="profile-guest-actions">
+            <a class="hud-btn hud-btn-primary" href="{% url 'main:login' %}?next={{ next|urlencode }}">Войти</a>
+            <a class="hud-btn" href="{% url 'main:register' %}?next={{ next|urlencode }}">Регистрация</a>
+        </div>
+    </div>
+{% else %}
+    <form class="profile-form" hx-post="{% url 'main:profile' %}" hx-target="#profile-modal-content" hx-swap="innerHTML"
+          hx-encoding="multipart/form-data" hx-push-url="false" hx-indicator="this" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="active_tab" value="{{ active_tab }}" data-active-tab>
+
+        <ul class="nav hud-tabs" role="tablist">
+            <li role="presentation">
+                <button type="button" class="hud-tab{% if active_tab == 'profile' %} active{% endif %}" data-bs-toggle="tab"
+                        data-bs-target="#profile-tab" data-tab-name="profile" role="tab" aria-controls="profile-tab"
+                        aria-selected="{% if active_tab == 'profile' %}true{% else %}false{% endif %}">
+                    Данные профиля
+                    {% if user_form.errors or profile_form.errors %}<span class="hud-tab-dot" aria-label="Есть ошибки"></span>{% endif %}
+                </button>
+            </li>
+            <li role="presentation">
+                <button type="button" class="hud-tab{% if active_tab == 'settings' %} active{% endif %}" data-bs-toggle="tab"
+                        data-bs-target="#settings-tab" data-tab-name="settings" role="tab" aria-controls="settings-tab"
+                        aria-selected="{% if active_tab == 'settings' %}true{% else %}false{% endif %}">
+                    Настройки
+                    {% if setting_form.errors %}<span class="hud-tab-dot" aria-label="Есть ошибки"></span>{% endif %}
+                </button>
+            </li>
+            <li role="presentation">
+                <button type="button" class="hud-tab{% if active_tab == 'api' %} active{% endif %}" data-bs-toggle="tab"
+                        data-bs-target="#api-tab" data-tab-name="api" role="tab" aria-controls="api-tab"
+                        aria-selected="{% if active_tab == 'api' %}true{% else %}false{% endif %}">
+                    API
+                </button>
+            </li>
+            <li role="presentation">
+                <button type="button" class="hud-tab{% if active_tab == 'usage' %} active{% endif %}" data-bs-toggle="tab"
+                        data-bs-target="#usage-tab" data-tab-name="usage" role="tab" aria-controls="usage-tab"
+                        aria-selected="{% if active_tab == 'usage' %}true{% else %}false{% endif %}">
+                    Расход
+                </button>
+            </li>
+        </ul>
+
+        <div class="modal-body">
+            {% if saved %}
+                <div class="hud-alert" role="status">
+                    <svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>
+                    Данные сохранены
+                </div>
+            {% endif %}
+
+            <div class="tab-content">
+                <div class="tab-pane fade{% if active_tab == 'profile' %} show active{% endif %}" id="profile-tab" role="tabpanel">
+                    <div class="profile-head">
+                        <div class="profile-avatar profile-avatar-lg" data-avatar-preview>{% partial avatar %}</div>
+                        <div class="profile-head-info">
+                            <p class="profile-head-name">{% partial display_name %}</p>
+                            <p class="profile-head-meta">@{{ user.username }} · с {{ profile.created_at|date:"d.m.Y" }}</p>
+                            <label class="hud-btn hud-btn-sm" for="{{ profile_form.avatar.id_for_label }}">
+                                <svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
+                                Загрузить аватар
+                            </label>
+                            {{ profile_form.avatar }}
+                            {% for error in profile_form.avatar.errors %}<p class="hud-error">{{ error }}</p>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="hud-grid">
+                        {% with field=user_form.first_name %}{% partial field %}{% endwith %}
+                        {% with field=user_form.last_name %}{% partial field %}{% endwith %}
+                        {% with field=user_form.email %}{% partial field %}{% endwith %}
+                        {% with field=profile_form.phone %}{% partial field %}{% endwith %}
+                    </div>
+                    {% with field=profile_form.bio %}{% partial field %}{% endwith %}
+                </div>
+
+                <div class="tab-pane fade{% if active_tab == 'settings' %} show active{% endif %}" id="settings-tab" role="tabpanel">
+                    <div class="hud-grid">
+                        {% with field=setting_form.theme %}{% partial field %}{% endwith %}
+                        {% with field=setting_form.language %}{% partial field %}{% endwith %}
+                    </div>
+
+                    <label class="hud-switch" for="{{ setting_form.notifications_enabled.id_for_label }}">
+                        {{ setting_form.notifications_enabled }}
+                        <span class="hud-switch-track" aria-hidden="true"><span class="hud-switch-thumb"></span></span>
+                        <span class="hud-switch-text">
+                            {{ setting_form.notifications_enabled.label }}
+                            <small>Показывать уведомления о новых ответах</small>
+                        </span>
+                    </label>
+                </div>
+
+                <div class="tab-pane fade{% if active_tab == 'api' %} show active{% endif %}" id="api-tab" role="tabpanel">
+                    {% if default_api %}
+                        <div class="api-default">
+                            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>
+                            <span><strong>{{ default_api.display_name }}</strong> — сервер по умолчанию, доступен без настройки.</span>
+                        </div>
+                    {% endif %}
+                    {% partial api_section %}
+                </div>
+
+                <div class="tab-pane fade{% if active_tab == 'usage' %} show active{% endif %}" id="usage-tab" role="tabpanel">
+                    <div class="usage-cards">
+                        <div class="usage-card">
+                            <span class="usage-card-label">Сегодня</span>
+                            <span class="usage-card-total">{{ usage.today.total|floatformat:"0g" }}</span>
+                            <span class="usage-card-split">↑ {{ usage.today.prompt|floatformat:"0g" }} · ↓ {{ usage.today.completion|floatformat:"0g" }}</span>
+                        </div>
+                        <div class="usage-card">
+                            <span class="usage-card-label">Этот месяц</span>
+                            <span class="usage-card-total">{{ usage.month.total|floatformat:"0g" }}</span>
+                            <span class="usage-card-split">↑ {{ usage.month.prompt|floatformat:"0g" }} · ↓ {{ usage.month.completion|floatformat:"0g" }}</span>
+                        </div>
+                        <div class="usage-card usage-card-accent">
+                            <span class="usage-card-label">Всего</span>
+                            <span class="usage-card-total">{{ usage.all.total|floatformat:"0g" }}</span>
+                            <span class="usage-card-split">↑ {{ usage.all.prompt|floatformat:"0g" }} · ↓ {{ usage.all.completion|floatformat:"0g" }} · запросов: {{ usage.all.requests }}</span>
+                        </div>
+                    </div>
+                    <p class="usage-legend">↑ входные токены (запрос и история чата) · ↓ выходные токены (ответ модели)</p>
+
+                    {% if usage.by_model %}
+                        <p class="hud-label">По моделям</p>
+                        <table class="usage-table">
+                            <thead>
+                                <tr><th>Модель</th><th>Запросов</th><th>↑ Вход</th><th>↓ Выход</th><th>Всего</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for row in usage.by_model %}
+                                    <tr>
+                                        <td><span class="usage-model">{{ row.model }}</span><span class="usage-api">{{ row.api_name }}</span></td>
+                                        <td>{{ row.requests }}</td>
+                                        <td>{{ row.prompt|floatformat:"0g" }}</td>
+                                        <td>{{ row.completion|floatformat:"0g" }}</td>
+                                        <td>{{ row.total|floatformat:"0g" }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p class="hud-empty">Запросов к моделям пока не было</p>
+                    {% endif %}
+
+                    {% if usage.has_estimated %}
+                        <p class="usage-note">Часть значений посчитана приблизительно — API не вернул данные о токенах.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button type="submit" class="hud-btn hud-btn-danger me-auto" form="logout-form">
+                <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                Выйти
+            </button>
+            <button type="button" class="hud-btn" data-bs-dismiss="modal">Закрыть</button>
+            <button type="submit" class="hud-btn hud-btn-primary">
+                <span class="hud-btn-idle">Сохранить</span>
+                <span class="hud-btn-busy">Сохранение<i>_</i></span>
+            </button>
+        </div>
+    </form>
+    <form id="logout-form" method="post" action="{% url 'main:logout' %}" hidden>{% csrf_token %}</form>
+    <form id="api-add-form" hx-post="{% url 'main:api_create' %}" hx-target="#api-section" hx-swap="outerHTML"
+          hx-push-url="false" novalidate hidden></form>
+
+    {% if saved %}
+        {# Обновляем аватар и имя в сайдбаре #}
+        <span class="profile-avatar" id="sidebar-profile-avatar" hx-swap-oob="true">{% partial avatar %}</span>
+        <span class="profile-name" id="sidebar-profile-name" hx-swap-oob="true">{% partial display_name %}</span>
+    {% endif %}
+{% endif %}

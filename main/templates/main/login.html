@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% partialdef title inline %}Вход — AI Sci-Fi{% endpartialdef %}{% endblock %}
+
+{% block background %}
+    <canvas id="neural-bg" aria-hidden="true"></canvas>
+    <script src="{% static 'main/js/neural-bg.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+{% partialdef content inline %}
+<section class="hud-panel auth-panel">
+    <img class="auth-logo" src="{% static 'main/img/stend-logo-for-dark-bg.svg' %}" alt="Logo">
+    <header class="hud-panel-header">
+        <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <h1>Вход</h1>
+    </header>
+
+    <form method="post" action="{% url 'main:login' %}" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+
+        {% for error in form.non_field_errors %}<p class="hud-error auth-error">{{ error }}</p>{% endfor %}
+
+        {% include 'main/profile.html#field' with field=form.username %}
+        {% include 'main/profile.html#field' with field=form.password %}
+
+        <button type="submit" class="hud-btn hud-btn-primary auth-submit">Войти</button>
+    </form>
+
+    <p class="auth-switch">Нет аккаунта? <a href="{% url 'main:register' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Зарегистрироваться</a></p>
+</section>
+{% endpartialdef %}
+{% endblock %}

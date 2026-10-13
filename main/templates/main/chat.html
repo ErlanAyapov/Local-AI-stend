@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% partialdef title inline %}{% if chat %}{{ chat.title }}{% else %}Новый чат{% endif %} — AI Sci-Fi{% endpartialdef %}{% endblock %}
+
+{% partialdef model_options %}
+<li class="model-menu-title">Выбор модели</li>
+{% for group in groups %}
+    <li class="model-group"{% if not group.api.is_default %} title="{{ group.api.api_url }}"{% endif %}>{{ group.api.display_name }}</li>
+    {% for model in group.models %}
+        <li>
+            <button type="button" class="model-option" data-api-id="{{ group.api.pk }}" data-model-id="{{ model }}"
+                    data-key="{{ group.api.pk }}:{{ model }}">
+                <span class="model-option-text"><span class="model-option-name">{{ model }}</span></span>
+                <svg class="model-option-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>
+            </button>
+        </li>
+    {% empty %}
+        <li class="model-menu-empty">{{ group.error|default:'Нет доступных моделей' }}</li>
+    {% endfor %}
+{% empty %}
+    <li class="model-menu-empty">
+        Нет подключённых API
+        <button type="button" class="hud-btn hud-btn-sm mt-2"
+                hx-get="{% url 'main:profile' %}?tab=api" hx-target="#profile-modal-content" hx-swap="innerHTML"
+                data-bs-toggle="modal" data-bs-target="#profile-modal">Подключить API</button>
+    </li>
+{% endfor %}
+{% endpartialdef %}
+
+{% block content %}
+{% partialdef content inline %}
+<link rel="stylesheet" href="{% static 'main/css/chat.css' %}">
+
+<section class="chat" data-ai-avatar="{% static 'main/img/stend-mark.svg' %}" data-selected="{{ selected }}"
+         data-send-url="{% if chat %}{% url 'main:chat_send' chat.pk %}{% else %}{% url 'main:chat_send_new' %}{% endif %}">
+    <header class="chat-header">
+        <div class="chat-title">
+            <span class="status-dot" aria-hidden="true"></span>
+            <div>
+                <h1 data-chat-title>{% if chat %}{{ chat.title }}{% else %}Новый чат{% endif %}</h1>
+                <p class="chat-subtitle"><span data-model-label>Модель не выбрана</span> · <span class="status-text">онлайн</span></p>
+            </div>
+        </div>
+
+        <div class="chat-header-actions">
+            <div class="dropdown model-select">
+                <button type="button" class="model-btn" data-bs-toggle="dropdown" data-bs-offset="0,8" aria-expanded="false" aria-label="Выбор модели">
+                    <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>
+                    <span class="model-btn-name" data-model-label>Загрузка…</span>
+                    <svg class="model-btn-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end model-menu" data-model-menu
+                    hx-get="{% url 'main:chat_models' %}" hx-trigger="load, apisChanged from:body"
+                    hx-target="this" hx-swap="innerHTML" hx-push-url="false">
+                    <li class="model-menu-title">Выбор модели</li>
+                    <li class="model-menu-empty"><span class="thinking"><span></span><span></span><span></span></span></li>
+                </ul>
+            </div>
+
+            <button type="button" class="icon-btn" aria-label="Удалить чат" data-chat-delete
+                    {% if chat %}hx-post="{% url 'main:chat_delete' chat.pk %}" hx-confirm="Удалить этот чат?"{% else %}hidden{% endif %}
+                    hx-push-url="false">
+                <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <div class="chat-messages" data-chat-messages aria-live="polite">
+        {% for message in chat_messages %}
+            {% if message.is_user %}
+                <div class="msg msg-user">
+                    <div class="msg-body">
+                        <div class="msg-meta">Вы</div>
+                        <div class="msg-bubble">{{ message.content }}</div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="msg msg-ai">
+                    <div class="msg-avatar"><img src="{% static 'main/img/stend-mark.svg' %}" alt=""></div>
+                    <div class="msg-body">
+                        <div class="msg-meta">{{ message.used_model|default:'AI' }}{% with u=message.token_usage %}{% if u %}<span class="msg-tokens" title="Входные / выходные токены{% if u.estimated %} (оценка){% endif %}">↑{{ u.prompt_tokens }} ↓{{ u.completion_tokens }}{% if u.estimated %}~{% endif %}</span>{% endif %}{% endwith %}</div>
+                        <div class="msg-bubble" data-markdown>{{ message.content }}</div>
+                    </div>
+                </div>
+            {% endif %}
+        {% empty %}
+            <div class="msg msg-ai">
+                <div class="msg-avatar"><img src="{% static 'main/img/stend-mark.svg' %}" alt=""></div>
+                <div class="msg-body">
+                    <div class="msg-meta">STEND AI</div>
+                    <div class="msg-bubble">Системы в норме. Чем могу помочь сегодня?</div>
+                </div>
+            </div>
+
+            <div class="chat-suggestions" data-chat-suggestions>
+                <button type="button" class="chip">Объясни, как работают нейросети</button>
+                <button type="button" class="chip">Составь план задач на неделю</button>
+                <button type="button" class="chip">Напиши функцию на Python</button>
+            </div>
+        {% endfor %}
+    </div>
+
+    <form class="chat-composer" data-chat-form autocomplete="off">
+        {% csrf_token %}
+        <input type="hidden" name="api" value="" data-chat-api>
+        <input type="hidden" name="model" value="" data-chat-model>
+        <label class="visually-hidden" for="chat-input">Сообщение</label>
+        <textarea id="chat-input" name="message" rows="1" maxlength="10000" placeholder="Введите сообщение…" data-chat-input></textarea>
+        <button type="submit" class="send-btn" aria-label="Отправить" data-chat-send disabled>
+            <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+    </form>
+    <p class="chat-hint">Enter — отправить, Shift+Enter — новая строка</p>
+</section>
+
+<script src="{% static 'main/js/chat.js' %}"></script>
+{% endpartialdef %}
+{% endblock %}
